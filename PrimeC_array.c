@@ -1,9 +1,3 @@
-// ---------------------------------------------------------------------------
-// PrimeC_array.c : C11 port of davepl's optimized prime sieve (solution_5)
-//                  Original C++ by Dave Plummer / davepl
-//                  Ported to C11 with pthreads and C11 atomics
-// ---------------------------------------------------------------------------
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdalign.h>
@@ -29,16 +23,10 @@
 #  define PRIMEC_VECTOR_NEON 1
 #elif defined(__AVX512F__)
 #  include <immintrin.h>
-#  define PRIMEC_VECTOR_AVX512 1
-#  define PRIMEC_VECTOR_AVX2   1
-#  define PRIMEC_VECTOR_SSE2   1
+#  define PRIMEC_VECTOR_AVX2 1
 #elif defined(__AVX2__)
 #  include <immintrin.h>
 #  define PRIMEC_VECTOR_AVX2 1
-#  define PRIMEC_VECTOR_SSE2 1
-#elif defined(__SSE2__) || defined(_M_X64) || defined(_M_IX86)
-#  include <emmintrin.h>
-#  define PRIMEC_VECTOR_SSE2 1
 #endif
 
 // ---------------------------------------------------------------------------
@@ -165,27 +153,19 @@ static inline bool ATTR_ALWAYS_INLINE bitarray_get(const BitArray* ba, size_t n)
     return !(ba->array[byte_i] & (uint8_t)(1u << bidx));
 }
 
-// Mark n as composite in the array (no-op if n is a multiple of 2, 3, or 5).
-static inline void ATTR_ALWAYS_INLINE bitarray_set(BitArray* ba, size_t n)
-{
-    uint8_t bidx = WHEEL30_INDEX[n % 30];
-    if (bidx == 0xFF) return;
-    ba->array[n / 30] |= (uint8_t)(1u << bidx);
-}
-
 // ---------------------------------------------------------------------------
 // mark_multiples_wheel30
 //
 // For prime p (p >= 7, coprime to 30), marks all composites p*q where q >= p
 // and q is coprime to 30.
 //
-// Small-p path (p <= 64):
+// Small-p path (p <= 61):
 //   Build a combined p-byte "tile" where tile[b % p] = OR of all series masks
 //   active at byte offset b.  After a short startup region, apply the tile
-//   sequentially — for NEON this means p different 16-byte phase vectors OR'd
-//   16 bytes at a time, giving ~16x fewer operations than byte-at-a-time.
+//   with SIMD (AVX2: 32-byte stores; NEON: 16-byte stores), giving ~32x or
+//   ~16x fewer store operations than byte-at-a-time.
 //
-// Large-p path (p > 64):
+// Large-p path (p > 61):
 //   Fall back to 8 independent strided byte-write loops.
 // ---------------------------------------------------------------------------
 static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
@@ -322,7 +302,6 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     // within an infinite periodic tiling is exactly extended_tile[i..i+31], so
     // nvecs[i] = loadu256(extended_tile + i).  Fill cost drops from stride×32
     // iterations to stride+31 iterations (21× cheaper at stride=61, 5× at stride=7).
-    // The smaller setup cost also lets us push the threshold to stride ≤ 149.
     // ---------------------------------------------------------------------------
     if (stride <= 61) {
         uint8_t tile[64];
@@ -539,10 +518,6 @@ static size_t prime_sieve_count(const prime_sieve* ps)
     }
 
     return count;
-}
-
-static bool prime_sieve_is_prime(const prime_sieve* ps, uint64_t n) {
-    return bitarray_get(&ps->bits, (size_t)n);
 }
 
 static const struct { uint64_t limit; int count; } results_table[] = {
