@@ -154,18 +154,54 @@ static inline bool ATTR_ALWAYS_INLINE bitarray_get(const BitArray* ba, size_t n)
 }
 
 // ---------------------------------------------------------------------------
+// Outlined AVX2 per-prime tile functions.
+//
+// Each function is __attribute__((noinline)) so it lives in its own region of
+// the µop cache (DSB = 1536 µops on Coffee Lake).  Previously these loops were
+// generated inline by a switch macro, making the entire mark_multiples_wheel30
+// function too large for the DSB and evicting the hot small-prime paths.
+// Outlining keeps the calling function compact while still giving each case a
+// fully-unrolled inner loop with a compile-time stride constant.
+// ---------------------------------------------------------------------------
+#if defined(PRIMEC_VECTOR_AVX2)
+#define DEFINE_AVX2_TILE(P) \
+static __attribute__((noinline)) size_t \
+avx2_tile_p##P(uint8_t* arr, size_t pos, size_t byteCount, const __m256i* nvecs) \
+{ \
+    while (pos + (size_t)(P) * 32u <= byteCount) { \
+        _Pragma("clang loop unroll(full)") \
+        for (int _i = 0; _i < (P); _i++) \
+            _mm256_storeu_si256((__m256i*)(arr + pos + (size_t)_i * 32u), \
+                _mm256_or_si256( \
+                    _mm256_loadu_si256((const __m256i*)(arr + pos + (size_t)_i * 32u)), \
+                    nvecs[_i])); \
+        pos += (size_t)(P) * 32u; \
+    } \
+    return pos; \
+}
+DEFINE_AVX2_TILE( 7) DEFINE_AVX2_TILE(11) DEFINE_AVX2_TILE(13)
+DEFINE_AVX2_TILE(17) DEFINE_AVX2_TILE(19) DEFINE_AVX2_TILE(23)
+DEFINE_AVX2_TILE(29) DEFINE_AVX2_TILE(31) DEFINE_AVX2_TILE(37)
+DEFINE_AVX2_TILE(41) DEFINE_AVX2_TILE(43) DEFINE_AVX2_TILE(47)
+DEFINE_AVX2_TILE(53) DEFINE_AVX2_TILE(59) DEFINE_AVX2_TILE(61)
+DEFINE_AVX2_TILE(67) DEFINE_AVX2_TILE(71) DEFINE_AVX2_TILE(73)
+DEFINE_AVX2_TILE(79)
+#undef DEFINE_AVX2_TILE
+#endif  // PRIMEC_VECTOR_AVX2
+
+// ---------------------------------------------------------------------------
 // mark_multiples_wheel30
 //
 // For prime p (p >= 7, coprime to 30), marks all composites p*q where q >= p
 // and q is coprime to 30.
 //
-// Small-p path (p <= 61):
+// Small-p path (p <= 79):
 //   Build a combined p-byte "tile" where tile[b % p] = OR of all series masks
 //   active at byte offset b.  After a short startup region, apply the tile
 //   with SIMD (AVX2: 32-byte stores; NEON: 16-byte stores), giving ~32x or
 //   ~16x fewer store operations than byte-at-a-time.
 //
-// Large-p path (p > 61):
+// Large-p path (p > 79):
 //   Fall back to 8 independent strided byte-write loops.
 // ---------------------------------------------------------------------------
 static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
@@ -303,8 +339,8 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     // nvecs[i] = loadu256(extended_tile + i).  Fill cost drops from stride×32
     // iterations to stride+31 iterations (21× cheaper at stride=61, 5× at stride=7).
     // ---------------------------------------------------------------------------
-    if (stride <= 61) {
-        uint8_t tile[64];
+    if (stride <= 79) {
+        uint8_t tile[80];
         memset(tile, 0, stride);
         for (int qi = 0; qi < 8; qi++) {
             if (smasks[qi] == 0) continue;
@@ -320,19 +356,17 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
                 arr[pos] |= mask;
         }
 
-        // Build extended_tile[stride+31]: just stride+31 iterations (not stride×32).
-        // nvecs[n] = loadu256(extended_tile + (n*32)%stride) gives the correct
-        // 32-byte periodic window for the n-th 32-byte block within each period.
-        // The rolling step is 32%stride — a single conditional subtract suffices.
-        uint8_t extended_tile[61 + 31];
+        // Build extended_tile[stride+31]: stride+31 iterations instead of stride×32.
+        // nvecs[n] = loadu256(extended_tile + (n*32)%stride) via rolling step.
+        uint8_t extended_tile[79 + 31];
         { size_t t = 0;
           for (size_t i = 0; i < stride + 31u; i++) {
               extended_tile[i] = tile[t];
               if (++t == stride) t = 0;
           }
         }
-        __m256i nvecs[61];
-        { const size_t step = 32u % stride;   // < stride, so one subtract suffices
+        __m256i nvecs[79];
+        { const size_t step = 32u % stride;
           size_t off = 0;
           for (size_t i = 0; i < stride; i++) {
               nvecs[i] = _mm256_loadu_si256((const __m256i*)(extended_tile + off));
@@ -341,41 +375,29 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
           }
         }
 
-#define AVX2_TILE_LOOP(P) \
-        { \
-            size_t _pos = tile_start; \
-            while (_pos + (size_t)(P) * 32u <= byteCount) { \
-                _Pragma("clang loop unroll(full)") \
-                for (int _i = 0; _i < (P); _i++) \
-                    _mm256_storeu_si256((__m256i*)(&arr[_pos + (size_t)_i * 32u]), \
-                        _mm256_or_si256( \
-                            _mm256_loadu_si256((const __m256i*)(&arr[_pos + (size_t)_i * 32u])), \
-                            nvecs[_i])); \
-                _pos += (size_t)(P) * 32u; \
-            } \
-            pos = _pos; \
-        }
-
         size_t pos;
         switch (stride) {
-            case   7: AVX2_TILE_LOOP(  7); break;
-            case  11: AVX2_TILE_LOOP( 11); break;
-            case  13: AVX2_TILE_LOOP( 13); break;
-            case  17: AVX2_TILE_LOOP( 17); break;
-            case  19: AVX2_TILE_LOOP( 19); break;
-            case  23: AVX2_TILE_LOOP( 23); break;
-            case  29: AVX2_TILE_LOOP( 29); break;
-            case  31: AVX2_TILE_LOOP( 31); break;
-            case  37: AVX2_TILE_LOOP( 37); break;
-            case  41: AVX2_TILE_LOOP( 41); break;
-            case  43: AVX2_TILE_LOOP( 43); break;
-            case  47: AVX2_TILE_LOOP( 47); break;
-            case  53: AVX2_TILE_LOOP( 53); break;
-            case  59: AVX2_TILE_LOOP( 59); break;
-            case  61: AVX2_TILE_LOOP( 61); break;
+            case  7: pos = avx2_tile_p7 (arr, tile_start, byteCount, nvecs); break;
+            case 11: pos = avx2_tile_p11(arr, tile_start, byteCount, nvecs); break;
+            case 13: pos = avx2_tile_p13(arr, tile_start, byteCount, nvecs); break;
+            case 17: pos = avx2_tile_p17(arr, tile_start, byteCount, nvecs); break;
+            case 19: pos = avx2_tile_p19(arr, tile_start, byteCount, nvecs); break;
+            case 23: pos = avx2_tile_p23(arr, tile_start, byteCount, nvecs); break;
+            case 29: pos = avx2_tile_p29(arr, tile_start, byteCount, nvecs); break;
+            case 31: pos = avx2_tile_p31(arr, tile_start, byteCount, nvecs); break;
+            case 37: pos = avx2_tile_p37(arr, tile_start, byteCount, nvecs); break;
+            case 41: pos = avx2_tile_p41(arr, tile_start, byteCount, nvecs); break;
+            case 43: pos = avx2_tile_p43(arr, tile_start, byteCount, nvecs); break;
+            case 47: pos = avx2_tile_p47(arr, tile_start, byteCount, nvecs); break;
+            case 53: pos = avx2_tile_p53(arr, tile_start, byteCount, nvecs); break;
+            case 59: pos = avx2_tile_p59(arr, tile_start, byteCount, nvecs); break;
+            case 61: pos = avx2_tile_p61(arr, tile_start, byteCount, nvecs); break;
+            case 67: pos = avx2_tile_p67(arr, tile_start, byteCount, nvecs); break;
+            case 71: pos = avx2_tile_p71(arr, tile_start, byteCount, nvecs); break;
+            case 73: pos = avx2_tile_p73(arr, tile_start, byteCount, nvecs); break;
+            case 79: pos = avx2_tile_p79(arr, tile_start, byteCount, nvecs); break;
             default: pos = tile_start; break;
         }
-#undef AVX2_TILE_LOOP
 
         // SIMD cleanup: reuse nvecs for full 32-byte blocks, then scalar for the
         // sub-32-byte tail.  nvec_idx starts at 0 (pos is aligned to stride×32).
