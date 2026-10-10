@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./primes_array.exe ${@:2}
+./primes_c_array.exe ${@:2}

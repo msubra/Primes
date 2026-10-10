@@ -513,7 +513,7 @@ static void prime_sieve_print(const prime_sieve* ps,
         prime_sieve_validate(ps) ? "Pass" : "FAIL!");
     fprintf(stderr, "\n");
 
-    printf("davepl_c_array_optimized;%zu;%g;%zu;algorithm=base,faithful=yes,bits=1\n",
+    printf("msubra_c_wheel30;%zu;%g;%zu;algorithm=wheel,faithful=yes,bits=1\n",
            passes, duration, threads);
 }
 
@@ -560,14 +560,13 @@ static void* thread_func(void* arg)
 {
     ThreadArgs* a      = (ThreadArgs*)arg;
     uint64_t    passes = 0;
-    prime_sieve sieve;
-    prime_sieve_init(&sieve, a->upperLimit);       // allocate once per thread
     while (atomic_load_explicit(a->keepRunning, memory_order_relaxed)) {
-        bitarray_reinit(&sieve.bits);              // just memset — no malloc/free
+        prime_sieve sieve;
+        prime_sieve_init(&sieve, a->upperLimit);
         prime_sieve_run(&sieve);
+        prime_sieve_destroy(&sieve);
         passes++;
     }
-    prime_sieve_destroy(&sieve);
     *a->passes = passes;
     return NULL;
 }

@@ -5,13 +5,13 @@ RUN apt-get update -qq \
  && apt-get install -y bash clang lld
 
 WORKDIR /opt/app
-COPY *.c .
+COPY PrimeC_array.c .
 
 ARG TARGETARCH
 RUN set -eux; \
-    CFLAGS="-march=native -mtune=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c11"; \
+    CFLAGS="-march=native -mtune=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c11 -fvectorize -fslp-vectorize"; \
     if [ "${TARGETARCH:-amd64}" = "arm64" ]; then \
-      CFLAGS="-mcpu=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c11"; \
+      CFLAGS="-mcpu=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c11 -fvectorize -fslp-vectorize"; \
     fi; \
     clang ${CFLAGS} -fuse-ld=lld PrimeC_array.c -o primes_c_array.exe -lm -lpthread
 
