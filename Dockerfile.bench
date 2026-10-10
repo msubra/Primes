@@ -1,0 +1,115 @@
+# Dockerfile.bench — standalone benchmark image (NOT the submission image)
+# Image name: primes_bench
+#
+# Builds all PrimeC reference solutions + local C/C++ solutions, then runs
+# bench.py to display a ranked comparison table.
+#
+# Usage:
+#   docker build -f Dockerfile.bench -t primes_bench .
+#   docker run --rm primes_bench
+
+FROM ubuntu:22.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -y \
+        clang lld gcc libgomp1 libomp-dev python3 git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Clone reference repo ────────────────────────────────────────────────────
+RUN git clone --depth=1 --branch drag-race \
+    https://github.com/PlummersSoftwareLLC/Primes.git /repo
+
+# ── Copy local source files ─────────────────────────────────────────────────
+WORKDIR /build
+COPY PrimeC_array.c PrimeC_extend.c PrimeC_w210.c PrimeCPP_array.cpp ./
+
+# ── solution_1 — mckoss  (needs prime-check.h in same dir) ──────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    -I /repo/PrimeC/solution_1 \
+    /repo/PrimeC/solution_1/sieve.c \
+    -o mckoss -lm
+
+# ── solution_2 — danielspaangberg (serial variants) ─────────────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    /repo/PrimeC/solution_2/sieve_8of30.c   -o daniel_8of30   -lm && \
+    gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    /repo/PrimeC/solution_2/sieve_48of210.c -o daniel_48of210 -lm
+
+# ── solution_2 — danielspaangberg (OpenMP epar variants) ────────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops -fopenmp \
+    /repo/PrimeC/solution_2/sieve_8of30_epar.c       -o daniel_8of30_epar       -lm && \
+    gcc -Ofast -march=native -mtune=native -funroll-all-loops -fopenmp \
+    /repo/PrimeC/solution_2/sieve_48of210_epar.c     -o daniel_48of210_epar     -lm && \
+    gcc -Ofast -march=native -mtune=native -funroll-all-loops -fopenmp \
+    /repo/PrimeC/solution_2/sieve_480of2310_epar.c   -o daniel_480of2310_epar   -lm && \
+    gcc -Ofast -march=native -mtune=native -funroll-all-loops -fopenmp \
+    /repo/PrimeC/solution_2/sieve_5760of30030_epar.c -o daniel_5760of30030_epar -lm
+
+# ── solution_3 — fvbakel ────────────────────────────────────────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    /repo/PrimeC/solution_3/primes_words.c         -o fvbakel_words   -lm && \
+    gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    /repo/PrimeC/solution_3/primes_striped-block.c -o fvbakel_striped -lm
+
+# ── solution_4 — merriam  (needs prime-check.h in same dir) ─────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    -I /repo/PrimeC/solution_4 \
+    /repo/PrimeC/solution_4/sieve.c \
+    -o merriam -lm
+
+# ── solution_5 — rogiervandam_extend ────────────────────────────────────────
+RUN gcc -Ofast -march=native -mtune=native -funroll-all-loops \
+    -I /repo/PrimeC/solution_5/src \
+    /repo/PrimeC/solution_5/src/sieve_extend.c \
+    -o rogiervandam -lm
+
+# ── Local C++ solution — davepl (Clang) ─────────────────────────────────────
+RUN clang++ -march=native -mtune=native -pthread -O3 -ffast-math \
+    -fno-math-errno -fno-trapping-math -flto -std=c++17 \
+    -fvectorize -fslp-vectorize -fuse-ld=lld \
+    PrimeCPP_array.cpp -o primes_cpp
+
+# ── Local C solutions — msubra (Clang + SIMD) ───────────────────────────────
+RUN clang -march=native -mtune=native -pthread -O3 -ffast-math \
+    -fno-math-errno -fno-trapping-math -flto -std=c11 \
+    -fvectorize -fslp-vectorize -fuse-ld=lld \
+    PrimeC_array.c -o primes_c_array -lm -lpthread && \
+    clang -march=native -mtune=native -pthread -O3 -ffast-math \
+    -fno-math-errno -fno-trapping-math -flto -std=c11 \
+    -fvectorize -fslp-vectorize -fuse-ld=lld \
+    PrimeC_extend.c -o primes_c_extend -lm -lpthread && \
+    clang -march=native -mtune=native -pthread -O3 -ffast-math \
+    -fno-math-errno -fno-trapping-math -flto -std=c11 \
+    -fvectorize -fslp-vectorize -fuse-ld=lld \
+    PrimeC_w210.c -o primes_c_w210 -lm -lpthread
+
+# ── Runtime image ────────────────────────────────────────────────────────────
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -y python3 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /bench
+
+COPY --from=build \
+    /build/mckoss \
+    /build/daniel_8of30 \
+    /build/daniel_48of210 \
+    /build/daniel_8of30_epar \
+    /build/daniel_48of210_epar \
+    /build/daniel_480of2310_epar \
+    /build/daniel_5760of30030_epar \
+    /build/fvbakel_words \
+    /build/fvbakel_striped \
+    /build/merriam \
+    /build/rogiervandam \
+    /build/primes_cpp \
+    /build/primes_c_array \
+    /build/primes_c_extend \
+    /build/primes_c_w210 \
+    ./
+
+COPY bench.py ./
+
+ENTRYPOINT ["python3", "bench.py"]
