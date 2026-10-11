@@ -19,22 +19,28 @@ run: build
 
 clean:
 	docker rmi -f $(IMAGE)
-	rm -f primes_c_array primes_array
+	rm -rf bin
 
-build-native: primes_c_array primes_array primes_c_w210
+bin:
+	mkdir -p bin
 
-primes_c_array: PrimeC_array.c
+build-native: bin/primes_c_array bin/primes_array bin/primes_c_extend bin/primes_c_w210
+
+bin/primes_c_array: PrimeC_array.c | bin
 	$(CC) $(CFLAGS) $< -o $@ -lm -lpthread
 
-primes_array: PrimeCPP_array.cpp
+bin/primes_array: PrimeCPP_array.cpp | bin
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-primes_c_w210: PrimeC_w210.c
+bin/primes_c_extend: PrimeC_extend.c | bin
+	$(CC) $(CFLAGS) $< -o $@ -lm -lpthread
+
+bin/primes_c_w210: PrimeC_w210.c | bin
 	$(CC) $(CFLAGS) $< -o $@ -lm -lpthread
 
 verify: build-native
-	./primes_c_array -1 -p 2>/tmp/c_raw.txt;   true
-	./primes_array   -1 -p 2>/tmp/cpp_raw.txt; true
+	./bin/primes_c_array -1 -p 2>/tmp/c_raw.txt;   true
+	./bin/primes_array   -1 -p 2>/tmp/cpp_raw.txt; true
 	grep '^2, ' /tmp/c_raw.txt   | tr ', ' '\n' | grep -E '^[0-9]+$$' > /tmp/c_primes.txt
 	grep '^2, ' /tmp/cpp_raw.txt | tr ', ' '\n' | grep -E '^[0-9]+$$' > /tmp/cpp_primes.txt
 	@echo "C   primes: $$(wc -l < /tmp/c_primes.txt)"

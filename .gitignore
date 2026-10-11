@@ -1,4 +1,4 @@
 .vscode/
 *.exe
 compile_commands.json
-primes_array
+bin/
