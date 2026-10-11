@@ -71,6 +71,16 @@ static const uint8_t WHEEL30_INDEX[30] = {
     0xFF, 4,    0xFF, 5,    0xFF, 0xFF, 0xFF, 6,
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 7
 };
+static const uint8_t SMASKS_TABLE[8][8] = {
+    /* p%30= 1 */ {0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80},
+    /* p%30= 7 */ {0x02,0x20,0x10,0x01,0x80,0x08,0x04,0x40},
+    /* p%30=11 */ {0x04,0x10,0x01,0x40,0x02,0x80,0x08,0x20},
+    /* p%30=13 */ {0x08,0x01,0x40,0x20,0x04,0x02,0x80,0x10},
+    /* p%30=17 */ {0x10,0x80,0x02,0x04,0x20,0x40,0x01,0x08},
+    /* p%30=19 */ {0x20,0x08,0x80,0x02,0x40,0x01,0x10,0x04},
+    /* p%30=23 */ {0x40,0x04,0x08,0x80,0x01,0x10,0x20,0x02},
+    /* p%30=29 */ {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01},
+};
 
 // Pre-sieve template: composites of 7, 11, 13 pre-marked.
 // Period = lcm(7,11,13) = 1001 bytes — exact multiple of all three strides.
@@ -213,18 +223,18 @@ static inline bool ATTR_ALWAYS_INLINE bitarray_get(const BitArray* ba, size_t n)
 static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
                                     size_t byteCount, uint64_t p)
 {
-    const uint32_t p_mod30 = (uint32_t)(p % 30);
+    const uint32_t p32     = (uint32_t)p;
+    const uint32_t p_mod30 = p32 % 30u;
     const size_t   stride  = (size_t)p;
+    const uint8_t* smask_row = SMASKS_TABLE[WHEEL30_INDEX[p_mod30]];
 
     size_t  first_bytes[8];
     uint8_t smasks[8];
-    size_t  max_first = 0;
     bool    any_valid = false;
 
     for (int qi = 0; qi < 8; qi++) {
-        const uint32_t r_q    = WHEEL30_RESIDUE[qi];
-        const uint32_t r_comp = (p_mod30 * r_q) % 30;
-        smasks[qi]            = (uint8_t)(1u << WHEEL30_INDEX[r_comp]);
+        const uint32_t r_q = WHEEL30_RESIDUE[qi];
+        smasks[qi]         = smask_row[qi];
 
         uint64_t q_start;
         if (r_q >= p_mod30)
@@ -239,7 +249,6 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
             continue;
         }
         any_valid = true;
-        if (first_bytes[qi] > max_first) max_first = first_bytes[qi];
     }
 
     if (!any_valid) return;
@@ -247,12 +256,14 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     if (stride <= 251) {
         uint8_t tile[256];
         memset(tile, 0, stride);
+        size_t tile_start = 0;
         for (int qi = 0; qi < 8; qi++) {
             if (smasks[qi] == 0) continue;
-            tile[first_bytes[qi] % stride] |= smasks[qi];
+            const size_t tile_off = (size_t)(p32 * (uint32_t)WHEEL30_RESIDUE[qi] / 30u);
+            tile[tile_off] |= smasks[qi];
+            const size_t ts_qi = first_bytes[qi] - tile_off + (tile_off ? stride : 0);
+            if (ts_qi > tile_start) tile_start = ts_qi;
         }
-
-        const size_t tile_start = ((max_first + stride - 1) / stride) * stride;
         for (int qi = 0; qi < 8; qi++) {
             if (smasks[qi] == 0) continue;
             const uint8_t mask = smasks[qi];
