@@ -8,8 +8,10 @@ CFLAGS   := -march=native -mtune=native -pthread -O3 -ffast-math \
 CXXFLAGS := -march=native -mtune=native -pthread -O3 -ffast-math \
              -fno-math-errno -fno-trapping-math -flto -std=c++17 \
              -fvectorize -fslp-vectorize
+LLVM_PROFDATA := $(shell xcrun -f llvm-profdata 2>/dev/null || echo llvm-profdata)
+PGO_DIR  := pgo_data
 
-.PHONY: build run clean build-native verify bench bench-build
+.PHONY: build run clean build-native verify bench bench-build pgo-extend
 
 build:
 	docker build -t $(IMAGE) .
@@ -52,3 +54,19 @@ bench-build:
 
 bench: bench-build
 	docker run --rm $(BENCH_IMAGE)
+
+# PGO build for primes_c_extend (+2.5% on this sieve; others show no benefit).
+# Instruments, profiles for 10s, merges, then rebuilds with profile data.
+pgo-extend: PrimeC_extend.c | bin $(PGO_DIR)
+	$(CC) $(CFLAGS) -fprofile-instr-generate=$(PGO_DIR)/extend.profraw \
+	    $< -o bin/primes_c_extend_pgo_instr -lm -lpthread
+	LLVM_PROFILE_FILE=$(PGO_DIR)/extend.profraw \
+	    ./bin/primes_c_extend_pgo_instr -t 1 -s 10 -q 2>/dev/null || true
+	$(LLVM_PROFDATA) merge $(PGO_DIR)/extend.profraw \
+	    -o $(PGO_DIR)/extend.profdata
+	$(CC) $(CFLAGS) -fprofile-instr-use=$(PGO_DIR)/extend.profdata \
+	    $< -o bin/primes_c_extend -lm -lpthread
+	rm -f bin/primes_c_extend_pgo_instr
+
+$(PGO_DIR):
+	mkdir -p $(PGO_DIR)

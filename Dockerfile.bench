@@ -12,7 +12,7 @@ FROM ubuntu:22.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y \
-        clang lld gcc libgomp1 libomp-dev python3 git ca-certificates \
+        clang lld gcc libgomp1 libomp-dev python3 git ca-certificates llvm-14 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Clone reference repo ────────────────────────────────────────────────────
@@ -77,11 +77,23 @@ RUN clang -march=native -mtune=native -pthread -O3 -ffast-math \
     clang -march=native -mtune=native -pthread -O3 -ffast-math \
     -fno-math-errno -fno-trapping-math -flto -std=c11 \
     -fvectorize -fslp-vectorize -fuse-ld=lld \
-    PrimeC_extend.c -o primes_c_extend -lm -lpthread && \
+    PrimeC_w210.c -o primes_c_w210 -lm -lpthread
+
+# ── primes_c_extend — PGO build (+2.5% 1T, +10% MT vs plain -O3) ─────────────
+RUN clang -march=native -mtune=native -pthread -O3 -ffast-math \
+    -fno-math-errno -fno-trapping-math -flto -std=c11 \
+    -fvectorize -fslp-vectorize -fuse-ld=lld \
+    -fprofile-instr-generate=/tmp/extend.profraw \
+    PrimeC_extend.c -o primes_c_extend_instr -lm -lpthread && \
+    LLVM_PROFILE_FILE=/tmp/extend.profraw \
+        ./primes_c_extend_instr -t 1 -s 10 -q 2>/dev/null || true && \
+    llvm-profdata-14 merge /tmp/extend.profraw -o /tmp/extend.profdata && \
     clang -march=native -mtune=native -pthread -O3 -ffast-math \
     -fno-math-errno -fno-trapping-math -flto -std=c11 \
     -fvectorize -fslp-vectorize -fuse-ld=lld \
-    PrimeC_w210.c -o primes_c_w210 -lm -lpthread
+    -fprofile-instr-use=/tmp/extend.profdata \
+    PrimeC_extend.c -o primes_c_extend -lm -lpthread && \
+    rm primes_c_extend_instr
 
 # ── Runtime image ────────────────────────────────────────────────────────────
 FROM ubuntu:22.04
