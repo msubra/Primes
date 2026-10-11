@@ -215,12 +215,12 @@ static inline bool ATTR_ALWAYS_INLINE bitarray_get(const BitArray* ba, size_t n)
 static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
                                     size_t byteCount, uint64_t p)
 {
-    const uint32_t p_mod30 = (uint32_t)(p % 30);
+    const uint32_t p32     = (uint32_t)p;
+    const uint32_t p_mod30 = p32 % 30u;
     const size_t   stride  = (size_t)p;
 
     size_t  first_bytes[8];
     uint8_t smasks[8];
-    size_t  max_first = 0;
     bool    any_valid = false;
 
     for (int qi = 0; qi < 8; qi++) {
@@ -241,7 +241,6 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
             continue;
         }
         any_valid = true;
-        if (first_bytes[qi] > max_first) max_first = first_bytes[qi];
     }
 
     if (!any_valid) return;
@@ -249,12 +248,17 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     if (stride <= 251) {
         uint8_t tile[256];
         memset(tile, 0, stride);
+        size_t tile_start = 0;
         for (int qi = 0; qi < 8; qi++) {
             if (smasks[qi] == 0) continue;
-            tile[first_bytes[qi] % stride] |= smasks[qi];
+            /* tile_off = first_bytes[qi] % stride, computed without hardware divide.
+               first_bytes[qi] = stride*a + tile_off, so the next aligned multiple is
+               stride*(a+1) when tile_off>0, or stride*a (already aligned) when tile_off==0. */
+            const size_t tile_off = (size_t)(p32 * (uint32_t)WHEEL30_RESIDUE[qi] / 30u);
+            tile[tile_off] |= smasks[qi];
+            const size_t ts_qi = first_bytes[qi] - tile_off + (tile_off ? stride : 0);
+            if (ts_qi > tile_start) tile_start = ts_qi;
         }
-
-        const size_t tile_start = ((max_first + stride - 1) / stride) * stride;
         for (int qi = 0; qi < 8; qi++) {
             if (smasks[qi] == 0) continue;
             const uint8_t mask = smasks[qi];
