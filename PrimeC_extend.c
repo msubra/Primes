@@ -70,6 +70,20 @@ static const uint8_t WHEEL30_INDEX[30] = {
     0xFF, 4,    0xFF, 5,    0xFF, 0xFF, 0xFF, 6,
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 7
 };
+// SMASKS_TABLE[WHEEL30_INDEX[p%30]][qi] = bitmask for the qi-th composite class
+// of prime p.  Encodes (1u << WHEEL30_INDEX[(p%30 * WHEEL30_RESIDUE[qi]) % 30])
+// for all 8 prime residues × 8 qi values (64 bytes = one cache line).
+// Rows indexed by WHEEL30_INDEX[p_mod30] (0..7 for {1,7,11,13,17,19,23,29}).
+static const uint8_t SMASKS_TABLE[8][8] = {
+    /* p%30= 1 */ {0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80},
+    /* p%30= 7 */ {0x02,0x20,0x10,0x01,0x80,0x08,0x04,0x40},
+    /* p%30=11 */ {0x04,0x10,0x01,0x40,0x02,0x80,0x08,0x20},
+    /* p%30=13 */ {0x08,0x01,0x40,0x20,0x04,0x02,0x80,0x10},
+    /* p%30=17 */ {0x10,0x80,0x02,0x04,0x20,0x40,0x01,0x08},
+    /* p%30=19 */ {0x20,0x08,0x80,0x02,0x40,0x01,0x10,0x04},
+    /* p%30=23 */ {0x40,0x04,0x08,0x80,0x01,0x10,0x20,0x02},
+    /* p%30=29 */ {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01},
+};
 
 // ---------------------------------------------------------------------------
 // Extended pre-sieve template: composites of 7, 11, 13, AND 17 pre-marked.
@@ -218,15 +232,16 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     const uint32_t p32     = (uint32_t)p;
     const uint32_t p_mod30 = p32 % 30u;
     const size_t   stride  = (size_t)p;
+    /* One cache-line table lookup replaces 8× (multiply + %30 + shift) */
+    const uint8_t* smask_row = SMASKS_TABLE[WHEEL30_INDEX[p_mod30]];
 
     size_t  first_bytes[8];
     uint8_t smasks[8];
     bool    any_valid = false;
 
     for (int qi = 0; qi < 8; qi++) {
-        const uint32_t r_q    = WHEEL30_RESIDUE[qi];
-        const uint32_t r_comp = (p_mod30 * r_q) % 30;
-        smasks[qi]            = (uint8_t)(1u << WHEEL30_INDEX[r_comp]);
+        const uint32_t r_q = WHEEL30_RESIDUE[qi];
+        smasks[qi]         = smask_row[qi];
 
         uint64_t q_start;
         if (r_q >= p_mod30)
