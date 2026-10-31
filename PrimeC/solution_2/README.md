@@ -152,41 +152,47 @@ danielspaangberg_480of2310_epar;19070;5.001330;4;algorithm=wheel,faithful=yes,bi
 danielspaangberg_5760of30030_epar;19314;5.001127;4;algorithm=wheel,faithful=yes,bits=1
 ```
 
-### msubra_8of30_extend — alternating runs vs the 8-of-30 entries it improves
+### msubra_8of30_extend — alternating runs vs all 8-of-30 entries
 
 x86-64, 16 logical CPUs (compiled with Apple Clang 16 / `clang -O3 -march=native`; existing
-variants compiled with Apple Clang 16 / `clang -Ofast -march=native`):
+variants compiled with Apple Clang 16 / `clang -Ofast -march=native`).
+`danielspaangberg_8of30_par` run with 4 threads (OMP_NUM_THREADS=4);
+`danielspaangberg_8of30_epar` and `msubra_8of30_extend` multi-threaded run with 16 threads.
 
 **Run 1**
 ```
-danielspaangberg_8of30;10840;5.000449;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9891;5.000447;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;63876;5.00188;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;90790;5.003995;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;440056;5.00104;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10769;5.000127;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9648;5.000230;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;18126;5.000035;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;87312;5.003558;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;63418;5.00242;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;474757;5.00108;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 2**
 ```
-danielspaangberg_8of30;10837;5.000244;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9875;5.000487;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;64439;5.0045;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;90209;5.003112;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;468594;5.00052;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10772;5.000243;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9886;5.000067;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;18887;5.000005;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;72821;5.005159;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;60819;5.00372;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;441805;5.00092;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 3**
 ```
-danielspaangberg_8of30;10832;5.000120;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9794;5.000308;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;64341;5.00021;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;90703;5.003809;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;470940;5.00042;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10750;5.000052;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9764;5.000468;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;18928;5.000210;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;91074;5.003659;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;63961;5.00281;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;475698;5.004;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
-Single-threaded: msubra_8of30_extend averages 64,219 passes vs 10,836 for
-danielspaangberg_8of30 (+493%) and 9,853 for danielspaangberg_8of30_owrb (+552%).
+Single-threaded: msubra_8of30_extend averages 62,733 passes vs 10,764 for
+danielspaangberg_8of30 (+483%) and 9,766 for danielspaangberg_8of30_owrb (+542%).
 Results are consistent across all three runs.
 
-Multi-threaded at 16 threads: msubra_8of30_extend averages 459,863 passes vs 90,567
-for danielspaangberg_8of30_epar (+408%). Results are consistent across all three runs.
+Multi-threaded at 16 threads: msubra_8of30_extend averages 464,087 passes vs 83,736
+for danielspaangberg_8of30_epar (+454%). The parallel inner-loop variant
+(danielspaangberg_8of30_par) averages 18,647 passes at 4 threads.
