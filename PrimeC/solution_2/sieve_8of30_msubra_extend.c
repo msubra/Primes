@@ -99,32 +99,49 @@ static const uint8_t SMASKS_TABLE[8][8] = {
 //
 // This function is called inside prime_sieve_init, which runs inside the
 // timed loop, so the presieve is part of each sieve instance's own state.
+//
+// Implementation: for each presieve prime p, compute the p-byte periodic
+// pattern of which wheel bits are divisible by p.  Tile it to 17017 bytes
+// (= lcm(7,11,13,17)/30) using O(log(17017/p)) doubling memcpy calls, then
+// OR into buf in one sequential vectorizable pass.  Sequential access lets
+// clang emit wide SIMD OR instructions instead of scalar scatter stores.
 // ---------------------------------------------------------------------------
 static void build_presieve(uint8_t* buf)
 {
-    // Step 1: base 1001-byte pattern (composites of 7, 11, 13)
-    uint8_t base[1001];
-    memset(base, 0, sizeof(base));
-    for (size_t j = 0; j < 1001; j++)
-        for (int k = 0; k < 8; k++) {
-            uint64_t n = (uint64_t)30 * j + WHEEL30_RESIDUE[k];
-            if (n % 7 == 0 || n % 11 == 0 || n % 13 == 0)
-                base[j] |= (uint8_t)(1u << k);
+    memset(buf, 0, 17017);
+
+    const uint64_t presieve_primes[4] = {7, 11, 13, 17};
+    uint8_t temp[17017];  // tiled pattern for one prime, then OR'd into buf
+
+    for (int pi = 0; pi < 4; pi++) {
+        const uint64_t p = presieve_primes[pi];
+        const size_t   period = (size_t)p;
+
+        // Compute the p-byte base pattern: one period of composites of p.
+        uint8_t base[17] = {0};  // period <= 17
+        for (int j = 0; j < 8; j++) {
+            const uint8_t mask = (uint8_t)(1u << j);
+            uint64_t n = WHEEL30_RESIDUE[j];
+            while (n % p != 0) n += 30;
+            base[(size_t)(n / 30) % period] |= mask;
         }
 
-    // Step 2: extend to 17017 bytes by tiling the base pattern 17 times.
-    // Valid because 30*1001 = 30030 = 2*3*5*7*11*13, divisible by 7, 11, 13.
-    for (int rep = 0; rep < 17; rep++)
-        memcpy(buf + rep * 1001, base, 1001);
-
-    // Step 3: OR in prime 17's composites across the full 17017-byte template.
-    // Valid because 30*17017 = 510510 = 2*3*5*7*11*13*17, divisible by 17.
-    for (size_t j = 0; j < 17017; j++)
-        for (int k = 0; k < 8; k++) {
-            uint64_t n = (uint64_t)30 * j + WHEEL30_RESIDUE[k];
-            if (n % 17 == 0)
-                buf[j] |= (uint8_t)(1u << k);
+        // Tile base to 17017 bytes using O(log N) doubling memcpy calls.
+        // Each doubled block is a multiple of period, so tiling is exact.
+        memcpy(temp, base, period);
+        size_t filled = period;
+        while (filled * 2 <= 17017) {
+            memcpy(temp + filled, temp, filled);
+            filled *= 2;
         }
+        if (filled < 17017)
+            memcpy(temp + filled, temp, 17017 - filled);
+
+        // OR temp into buf — sequential read+write, clang vectorizes with SIMD.
+        _Pragma("clang loop vectorize(enable)")
+        for (size_t j = 0; j < 17017; j++)
+            buf[j] |= temp[j];
+    }
     // n=1 (bit 0 of byte 0) is handled by dst[0]=0x01 in bitarray_reinit.
 }
 
@@ -173,7 +190,8 @@ static void bitarray_init(BitArray* ba, size_t size)
         ba->allocationKind  = ALLOC_NEW_ARRAY;
     }
 #endif
-    memset(ba->array, 0x00, ba->byteSize);
+    // No memset here: bitarray_reinit overwrites every byte with the presieve
+    // template, making a prior zero-fill redundant.
 }
 
 // Tile the 17017-byte pre-sieve template across the array.
@@ -263,7 +281,7 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
     if (!any_valid) return;
 
     if (stride <= 256) {
-        uint8_t tile[256];
+        alignas(32) uint8_t tile[256];
         memset(tile, 0, stride);
         size_t tile_start = 0;
         for (int qi = 0; qi < 8; qi++) {
@@ -286,7 +304,7 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
         // Uses a runtime stride (no hardcoded prime enumeration).
         // _Pragma hints clang's vectorizer to process the inner byte loop with SIMD.
         const size_t blk = stride * 16;
-        uint8_t wide_tile[256 * 16]; // max buffer: 256*16 = 4096 bytes
+        alignas(32) uint8_t wide_tile[256 * 16]; // max buffer: 256*16 = 4096 bytes
         for (size_t k = 0; k < 16; k++)
             memcpy(wide_tile + k * stride, tile, stride);
 
