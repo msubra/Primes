@@ -159,34 +159,34 @@ variants compiled with Apple Clang 16 / `clang -Ofast -march=native`):
 
 **Run 1**
 ```
-danielspaangberg_8of30;10822;5.000288;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9877;5.000460;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;15124;5.00503;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;90665;5.003195;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;118819;5.0015;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10840;5.000449;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9891;5.000447;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;63876;5.00188;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;90790;5.003995;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;440056;5.00104;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 2**
 ```
-danielspaangberg_8of30;10835;5.000095;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9859;5.000229;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;14993;5.00043;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;89454;5.003921;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;90012;5.0021;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10837;5.000244;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9875;5.000487;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;64439;5.0045;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;90209;5.003112;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;468594;5.00052;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 3**
 ```
-danielspaangberg_8of30;10583;5.000089;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9874;5.000446;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;15087;5.00497;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;89449;5.003541;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;114809;5.00487;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10832;5.000120;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9794;5.000308;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;64341;5.00021;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;90703;5.003809;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;470940;5.00042;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
-Single-threaded: msubra_8of30_extend is consistently ~40% faster than danielspaangberg_8of30
-(avg 15,068 vs 10,747 passes) and ~53% faster than danielspaangberg_8of30_owrb.
+Single-threaded: msubra_8of30_extend averages 64,219 passes vs 10,836 for
+danielspaangberg_8of30 (+493%) and 9,853 for danielspaangberg_8of30_owrb (+552%).
+Results are consistent across all three runs.
 
-Multi-threaded at 16 threads: msubra_8of30_extend leads in 2 of 3 runs (+31% and +28%)
-but run 2 was essentially tied (+0.6%). Variance is due to P/E core scheduling on this
-machine; the per-core single-threaded lead is the more stable signal.
+Multi-threaded at 16 threads: msubra_8of30_extend averages 459,863 passes vs 90,567
+for danielspaangberg_8of30_epar (+408%). Results are consistent across all three runs.
