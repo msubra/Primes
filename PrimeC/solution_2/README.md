@@ -61,11 +61,29 @@ Also, running the sieves in parallel in different threads in an embarrassingly p
 
 5760of30030_epar - Implementation writing bits in style (2), embarrassingly parallel
 
+8of30_msubra_extend - Contributed by msubra. An 8-of-30 wheel implementation
+with two additional optimizations over the standard 8-of-30 approach:
+
+1. **Extended pre-sieve**: composites of 7, 11, 13, and 17 are pre-computed
+   as a 17017-byte template (lcm(7,11,13,17)) built inductively. For N=1,000,000
+   this reduces tiling to 2 memcpy calls and eliminates four marking passes per
+   iteration. The presieve is built as part of each sieve instance (inside the
+   timed loop) so each pass owns its own complete state.
+
+2. **Wide-tile vectorization**: for primes with stride ≤ 256, multiples are
+   marked by building a stride-byte tile, expanding it 16× into a 4096-byte
+   wide tile, then ORing across the sieve with Clang auto-vectorized inner loops
+   (NEON on arm64, AVX2 on x86-64). The stride is a runtime value — no hardcoded
+   prime enumeration.
+
+Requires Clang (uses `_Pragma("clang loop vectorize(enable)")`). Command-line
+interface, `custom_atoll`, oneshot mode, and `benchmark.sh` pattern adapted
+from PrimeCPP/solution_5.
 
 ## Run instructions
 You can use the Dockerfile - but the code (especially the parallel implementations) runs (much) slower in docker.
 
-First compile the code using the compile.sh script. Optimization parameters are at the beginning of the script. They are set up to use the gcc compiler.
+First compile the code using the compile.sh script. Optimization parameters are at the beginning of the script. They are set up to use the gcc compiler. The msubra variant is compiled separately with clang (both gcc and clang are installed in the Docker image).
 
 Then run the code using the run.sh script. (You can change the number of threads in the script, the default runs up to 4 threads on the parallel bit masking and the maximum number of cpus on the embarrassingly parallel implementation).
 
@@ -133,3 +151,42 @@ danielspaangberg_48of210_epar;19032;5.001211;4;algorithm=wheel,faithful=yes,bits
 danielspaangberg_480of2310_epar;19070;5.001330;4;algorithm=wheel,faithful=yes,bits=1
 danielspaangberg_5760of30030_epar;19314;5.001127;4;algorithm=wheel,faithful=yes,bits=1
 ```
+
+### msubra_8of30_extend — alternating runs vs the 8-of-30 entries it improves
+
+x86-64, 16 logical CPUs (compiled with Apple Clang 16 / `clang -O3 -march=native`; existing
+variants compiled with Apple Clang 16 / `clang -Ofast -march=native`):
+
+**Run 1**
+```
+danielspaangberg_8of30;10822;5.000288;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9877;5.000460;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;15124;5.00503;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;90665;5.003195;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;118819;5.0015;16;algorithm=wheel,faithful=yes,bits=1
+```
+
+**Run 2**
+```
+danielspaangberg_8of30;10835;5.000095;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9859;5.000229;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;14993;5.00043;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;89454;5.003921;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;90012;5.0021;16;algorithm=wheel,faithful=yes,bits=1
+```
+
+**Run 3**
+```
+danielspaangberg_8of30;10583;5.000089;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9874;5.000446;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;15087;5.00497;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;89449;5.003541;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;114809;5.00487;16;algorithm=wheel,faithful=yes,bits=1
+```
+
+Single-threaded: msubra_8of30_extend is consistently ~40% faster than danielspaangberg_8of30
+(avg 15,068 vs 10,747 passes) and ~53% faster than danielspaangberg_8of30_owrb.
+
+Multi-threaded at 16 threads: msubra_8of30_extend leads in 2 of 3 runs (+31% and +28%)
+but run 2 was essentially tied (+0.6%). Variance is due to P/E core scheduling on this
+machine; the per-core single-threaded lead is the more stable signal.

@@ -4,7 +4,7 @@ for x in sieve_1of2 sieve_8of30 sieve_8of30_only_write_read_bits sieve_48of210 s
     ./$x
 done
 # Thread parallel versions, computing each sieve quicker.
-# 
+#
 # Chooses a number corresponding to all processing units in your system,
 # but max 4 since it does not scale extremely well
 NUM_PROCS=`nproc`
@@ -20,3 +20,6 @@ NUM_PROCS=`nproc`
 for x in sieve_1of2_epar sieve_8of30_epar sieve_48of210_epar sieve_480of2310_epar sieve_5760of30030_epar; do
     OMP_NUM_THREADS=$NUM_PROCS ./$x
 done
+# msubra's 8-of-30 with presieve and wide-tile marking
+./sieve_8of30_msubra_extend -t 1
+./sieve_8of30_msubra_extend -t $NUM_PROCS
