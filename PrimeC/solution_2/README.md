@@ -76,7 +76,7 @@ with two additional optimizations over the standard 8-of-30 approach:
    (NEON on arm64, AVX2 on x86-64). The stride is a runtime value — no hardcoded
    prime enumeration.
 
-Requires Clang (uses `_Pragma("clang loop vectorize(enable)")`). Command-line
+Compiled with GCC (uses `#pragma GCC ivdep` for auto-vectorization; Clang uses `clang loop vectorize(enable)` via the same `VECTORIZE_HINT` macro). Command-line
 interface, `custom_atoll`, oneshot mode, and `benchmark.sh` pattern adapted
 from PrimeCPP/solution_5.
 

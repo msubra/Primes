@@ -53,6 +53,15 @@ static const uint64_t DEFAULT_UPPER_LIMIT = 1000000ULL;
 #  define PRIMEC_RESTRICT
 #endif
 
+// Vectorization hint: tell the compiler loop iterations are independent.
+#if defined(__clang__)
+#  define VECTORIZE_HINT _Pragma("clang loop vectorize(enable)")
+#elif defined(__GNUC__)
+#  define VECTORIZE_HINT _Pragma("GCC ivdep")
+#else
+#  define VECTORIZE_HINT
+#endif
+
 // ---------------------------------------------------------------------------
 // Wheel of 30: store only numbers coprime to 30.
 // 8 residues per wheel period: {1, 7, 11, 13, 17, 19, 23, 29}.
@@ -137,8 +146,8 @@ static void build_presieve(uint8_t* buf)
         if (filled < 17017)
             memcpy(temp + filled, temp, 17017 - filled);
 
-        // OR temp into buf — sequential read+write, clang vectorizes with SIMD.
-        _Pragma("clang loop vectorize(enable)")
+        // OR temp into buf — sequential read+write, auto-vectorized with SIMD.
+        VECTORIZE_HINT
         for (size_t j = 0; j < 17017; j++)
             buf[j] |= temp[j];
     }
@@ -302,7 +311,7 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
 
         // Generic wide-tile: expand tile 16x then OR across the sieve.
         // Uses a runtime stride (no hardcoded prime enumeration).
-        // _Pragma hints clang's vectorizer to process the inner byte loop with SIMD.
+        // VECTORIZE_HINT tells the compiler loop iterations are independent (enables SIMD).
         const size_t blk = stride * 16;
         alignas(32) uint8_t wide_tile[256 * 16]; // max buffer: 256*16 = 4096 bytes
         for (size_t k = 0; k < 16; k++)
@@ -312,7 +321,7 @@ static void mark_multiples_wheel30(uint8_t* PRIMEC_RESTRICT arr,
         const uint8_t* PRIMEC_RESTRICT _wt = wide_tile;
         size_t _b = tile_start;
         for (; _b + blk <= byteCount; _b += blk) {
-            _Pragma("clang loop vectorize(enable)")
+            VECTORIZE_HINT
             for (size_t _j = 0; _j < blk; _j++)
                 _a[_b + _j] |= _wt[_j];
         }
