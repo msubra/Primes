@@ -154,45 +154,73 @@ danielspaangberg_5760of30030_epar;19314;5.001127;4;algorithm=wheel,faithful=yes,
 
 ### msubra_8of30_extend — alternating runs vs all 8-of-30 entries
 
-x86-64, 16 logical CPUs (compiled with Apple Clang 16 / `clang -O3 -march=native`; existing
-variants compiled with Apple Clang 16 / `clang -Ofast -march=native`).
-`danielspaangberg_8of30_par` run with 4 threads (OMP_NUM_THREADS=4);
-`danielspaangberg_8of30_epar` and `msubra_8of30_extend` multi-threaded run with 16 threads.
+All variants compiled with `gcc -Ofast -march=native` (existing entries) and
+`gcc -O3 -ffast-math -march=native` (msubra_8of30_extend).
+
+---
+
+#### macOS — Intel i9-9980HK @ 2.40 GHz, Coffee Lake, AVX2, 16 logical / 8 physical cores, GCC = Apple Clang 16
+
+`danielspaangberg_8of30_par` run with 4 threads; `_epar` and msubra multi-threaded run with 16 threads.
 
 **Run 1**
 ```
-danielspaangberg_8of30;10769;5.000127;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9648;5.000230;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_par;18126;5.000035;4;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;87312;5.003558;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;63418;5.00242;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;474757;5.00108;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10778;5.000255;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9891;5.000099;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;19173;5.000219;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;89449;5.003619;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;62420;5.00218;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;454673;5.00383;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 2**
 ```
-danielspaangberg_8of30;10772;5.000243;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9886;5.000067;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_par;18887;5.000005;4;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;72821;5.005159;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;60819;5.00372;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;441805;5.00092;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10750;5.000242;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9821;5.000513;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;18991;5.000192;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;89203;5.003243;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;62747;5.00419;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;457053;5.00265;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
 **Run 3**
 ```
-danielspaangberg_8of30;10750;5.000052;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_owrb;9764;5.000468;1;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_par;18928;5.000210;4;algorithm=wheel,faithful=yes,bits=1
-danielspaangberg_8of30_epar;91074;5.003659;16;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;63961;5.00281;1;algorithm=wheel,faithful=yes,bits=1
-msubra_8of30_extend;475698;5.004;16;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30;10709;5.000138;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;9811;5.000385;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;19017;5.000146;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;89105;5.004075;16;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;62568;5.00381;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;452681;5.00119;16;algorithm=wheel,faithful=yes,bits=1
 ```
 
-Single-threaded: msubra_8of30_extend averages 62,733 passes vs 10,764 for
-danielspaangberg_8of30 (+483%) and 9,766 for danielspaangberg_8of30_owrb (+542%).
-Results are consistent across all three runs.
+Single-threaded: msubra_8of30_extend averages 62,578 passes vs 10,746 for
+danielspaangberg_8of30 (**+482%**) and 9,841 for danielspaangberg_8of30_owrb (**+536%**).
 
-Multi-threaded at 16 threads: msubra_8of30_extend averages 464,087 passes vs 83,736
-for danielspaangberg_8of30_epar (+454%). The parallel inner-loop variant
-(danielspaangberg_8of30_par) averages 18,647 passes at 4 threads.
+Multi-threaded at 16 threads: msubra_8of30_extend averages 454,802 passes vs 89,252
+for danielspaangberg_8of30_epar (**+410%**).
+
+---
+
+#### Linux — Intel Xeon X5650 @ 2.67 GHz, Westmere, SSE4.2 only, 24 logical / 6 physical cores, GCC 10.2.1
+
+`danielspaangberg_8of30_par` run with 4 threads; `_epar` and msubra multi-threaded run with 24 threads.
+
+```
+danielspaangberg_8of30;8684;5.000356;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_owrb;8431;5.000151;1;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_par;12788;5.000079;4;algorithm=wheel,faithful=yes,bits=1
+danielspaangberg_8of30_epar;88134;5.003377;24;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;32874;5.00036;1;algorithm=wheel,faithful=yes,bits=1
+msubra_8of30_extend;356427;5.00062;24;algorithm=wheel,faithful=yes,bits=1
+```
+
+Single-threaded: msubra_8of30_extend scores 32,874 passes vs 8,684 for
+danielspaangberg_8of30 (**+278%**) and 8,431 for danielspaangberg_8of30_owrb (**+290%**).
+
+Multi-threaded at 24 threads: msubra_8of30_extend scores 356,427 passes vs 88,134
+for danielspaangberg_8of30_epar (**+304%**).
+
+The smaller gain on Linux is expected: the Xeon X5650 (Westmere, 2010) supports only
+SSE4.2 (128-bit SIMD). The wide-tile OR loop that drives msubra's speed processes 256
+bits per cycle on AVX2 (macOS) vs 128 bits on SSE4.2 (gamma), halving the vectorization
+benefit. The algorithmic improvement is consistent across both platforms.
