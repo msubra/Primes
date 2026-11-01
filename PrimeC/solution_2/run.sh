@@ -7,6 +7,37 @@ for arg in "$@"; do
     fi
 done
 
+# Print machine specs
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+KERNEL="$(uname -r)"
+if [ "$OS" = "Darwin" ]; then
+    CPU="$(sysctl -n machdep.cpu.brand_string 2>/dev/null)"
+    LOGICAL_CPUS="$(sysctl -n hw.logicalcpu)"
+    PHYSICAL_CPUS="$(sysctl -n hw.physicalcpu)"
+    MEM_BYTES="$(sysctl -n hw.memsize)"
+    MEM_GB="$(echo "$MEM_BYTES" | awk '{printf "%.0f", $1/1073741824}')"
+    MEM="${MEM_GB}GB"
+else
+    CPU="$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)"
+    LOGICAL_CPUS="$(nproc)"
+    PHYSICAL_CPUS="$(grep 'cpu cores' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)"
+    MEM_KB="$(grep MemTotal /proc/meminfo | awk '{print $2}')"
+    MEM_GB="$(echo "$MEM_KB" | awk '{printf "%.0f", $1/1048576}')"
+    MEM="${MEM_GB}GB"
+fi
+GCC_VER="$(gcc --version 2>/dev/null | head -1)"
+CLANG_VER="$(clang --version 2>/dev/null | head -1)"
+
+echo "=========================================="
+echo "Machine: $OS $ARCH  kernel=$KERNEL"
+echo "CPU:     $CPU"
+echo "Cores:   $LOGICAL_CPUS logical / $PHYSICAL_CPUS physical"
+echo "Memory:  $MEM"
+echo "GCC:     $GCC_VER"
+echo "Clang:   $CLANG_VER"
+echo "=========================================="
+
 # Serial versions
 for x in sieve_1of2 sieve_8of30 sieve_8of30_only_write_read_bits sieve_48of210 sieve_48of210_only_write_read_bits sieve_480of2310_only_write_read_bits sieve_5760of30030_only_write_read_bits; do
     ./$x
